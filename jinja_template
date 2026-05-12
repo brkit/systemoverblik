@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Systemoverblik</title>
+  <link rel="stylesheet" href="pico.min.css">
+</head>
+
+<body>
+  <main class="container-fluid">
+    <h1>Overblik over IT systemer i BRK ( {{ systems|length }} systemer )</h1>
+    <p style="color: #888; font-size: 0.9em;">Sidst opdateret: {{ generation_timestamp }}</p>
+
+    <input id="q" placeholder="Søg…" onkeyup="filter()">
+
+    <table role="grid">
+      <thead>
+        <tr>
+          <th>System</th>
+          <th>Beskrivelse</th>
+          <th>Leverandør</th>
+          <th>Ansvarlig enhed</th>
+          <th>Relevante organisationsenheder</th>
+          <th>System Administratorer</th>
+          <th>Referencer</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in systems %} <tr data-key="{{ s.name }}">
+          <td>{{ s.name }}</td>
+          <td>{{ s.description }}</td>
+          <td>{{ s.supplier }}</td>
+          <td>{{ s.responsibleOrganizationUnit }}</td>
+          <td>{{ s.usingOrganizationUnits | join(', ') }}</td>
+          <td>
+            {%- for user, role in s.roles.items() %}
+            {{ user }}: {{ role }}{% if not loop.last %}, {% endif %}
+            {%- endfor %}
+          </td>
+          <td>
+            {%- for ref in s.externalReferences %}
+            <a href="{{ ref.url }}" target="_blank">{{ ref.title }}</a>{% if not loop.last %}, {% endif %}
+            {%- endfor %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+</body>
+
+<script src="fuse.js"></script>
+<script>
+  /* linteren tror det er js, men det er jinja */
+  const systems = {{ systems_json | safe }};
+
+  /* Build the Fuse index */
+  const fuse = new Fuse(systems, {
+    includeScore: false,
+    threshold: 0.4,
+    keys: [
+      "name",
+      "description",
+      "supplier",
+      "responsibleOrganizationUnit",
+      "usingOrganizationUnits"
+    ]
+  });
+
+  const rows = Array.from(document.querySelectorAll("table[role='grid'] tbody tr"));
+
+  const rowByKey = Object.fromEntries(
+    rows.map(r => [r.dataset.key, r])
+  );
+
+  document.getElementById("q").addEventListener("input", e => {
+    const query = e.target.value.trim();
+    if (query === "") {
+      rows.forEach(r => r.style.display = "");
+      return;
+    }
+
+    const hits = new Set(fuse.search(query).map(r => r.item.name));
+    rows.forEach(r => {
+      r.style.display = hits.has(r.dataset.key) ? "" : "none";
+    });
+  });
+</script>
+
+</html>
